@@ -2,7 +2,7 @@
 
 <div align="center">
 
-<!-- Replace with actual paper badge/link once published -->
+[![arXiv](https://img.shields.io/badge/arXiv-2601.00226-b31b1b.svg)](https://arxiv.org/abs/2601.00226)
 ![Status](https://img.shields.io/badge/status-code%20coming%20soon-orange)
 ![License](https://img.shields.io/badge/license-TBD-blue)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
@@ -10,7 +10,7 @@
 
 **Physics-Informed Deep Learning for Geometric Distortion Correction in Prostate DWI**
 
-*Code and pre-trained weights will be released upon paper publication.*
+*Pre-print available on [arXiv:2601.00226](https://arxiv.org/abs/2601.00226). Code and pre-trained weights will be released upon paper publication.*
 
 </div>
 
@@ -144,8 +144,9 @@ If you find this work useful, please cite our paper (BibTeX will be provided upo
   title   = {Let Distortion Guide Restoration: Physics-Informed Deep Learning
              for Geometric Distortion Correction in Prostate Diffusion-Weighted MRI},
   author  = {Anonymous},
-  journal = {Under Review},
-  year    = {2025}
+  journal = {arXiv preprint arXiv:2601.00226},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2601.00226}
 }
 ```
 
