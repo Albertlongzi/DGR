@@ -1,65 +1,70 @@
-# DGR — Distortion-Guided Restoration for Prostate Diffusion MRI
+# Let Distortion Guide Restoration (DGR)
 
-Reference implementation of
+<div align="center">
+
+[![Paper](https://img.shields.io/badge/Radiology%20Advances-10.1093%2Fradadv%2Fumag031-1a7f37.svg)](https://doi.org/10.1093/radadv/umag031)
+[![arXiv](https://img.shields.io/badge/arXiv-2601.00226-b31b1b.svg)](https://arxiv.org/abs/2601.00226)
+[![Weights](https://img.shields.io/badge/%F0%9F%A4%97%20weights-gated-yellow.svg)](https://huggingface.co/Zylong/DGR)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue)
+![PyTorch](https://img.shields.io/badge/framework-PyTorch-red)
+
+**Physics-Informed Deep Learning for Geometric Distortion Correction in Prostate DWI**
+
+</div>
 
 > **Distortion-guided restoration: a physics-informed learning framework to correct prostate diffusion MRI artifacts**
 > Ziyang Long, Nader Binesh, Lixia Wang, Archana Vadiraj Malaji, Chia-Chi Yang, Haoran Sun,
 > Rola Saouaf, Timothy Daskivich, Hyung Kim, Yibin Xie, Debiao Li, Hsin-Jung Yang.
 > *Radiology Advances* 3(4), 2026. [doi:10.1093/radadv/umag031](https://doi.org/10.1093/radadv/umag031)
 
-DGR corrects susceptibility-induced geometric distortion in single-shot EPI prostate DWI
-**without acquiring a field map or a reverse phase-encode scan**. It has two halves, and this
-repository ships both:
+---
+
+## Overview
+
+Prostate multiparametric MRI (mpMRI) is the clinical gold standard for prostate cancer detection and PI-RADS grading. However, the diffusion-weighted imaging (DWI) component — acquired using single-shot echo-planar imaging (ssEPI) — is highly vulnerable to B0 field inhomogeneities, causing severe geometric distortions in the form of spatial warping, pixel pile-up, and signal dropout. These artifacts are dramatically worse in patients with **hip prostheses** or **bowel distension**, precisely the demographic most at risk for prostate cancer.
+
+**DGR** addresses this without any additional scan acquisition. By learning to invert a physics-based forward distortion simulator, DGR corrects severe geometric distortions using only routinely acquired DWI and T2-weighted images.
+
+<div align="center">
+
+```
+Distorted ssEPI DWI  ──────────────────────────────►  Corrected DWI
+(geometric warping,                                   (anatomically
+ pixel pile-up,                                        faithful,
+ signal dropout)                                       diagnostic quality)
+```
+
+</div>
+
+This repository ships **both halves** of the method — you can regenerate the training data, not
+just run the network:
 
 | Half | What it does | Where |
 |---|---|---|
-| **Forward — simulation** | A physics forward model that takes a measured ΔB0 field, resamples it into a large family of physically plausible variants, and warps *undistorted* DWI into *distorted* DWI. This manufactures the paired training data that does not exist clinically. | `dgr/physics/`, `scripts/simulation/` |
-| **Reverse — restoration** | A two-stage network that inverts that forward model: a CNN front-end produces the geometric correction, then a conditional diffusion module refines it on the anatomical manifold using the co-registered T2w image as guidance. | `dgr/models/`, `dgr/inference/`, `scripts/restoration/` |
+| **Forward — simulation** | Takes a measured ΔB0 field, fits it, perturbs it into a family of physically plausible variants, converts each to a voxel displacement map from the EPI readout geometry, and warps *undistorted* DWI into *distorted* DWI. This manufactures the paired training data that does not exist clinically. | `dgr/physics/`, `dgr/utils/`, `scripts/simulation/` |
+| **Reverse — restoration** | Inverts that forward model: a CNN front-end produces the geometric correction, then a conditional diffusion module refines it on the anatomical manifold under T2w guidance. | `dgr/models/`, `dgr/inference/`, `scripts/restoration/` |
 
 ---
 
-## Install
+## Key Features
 
-```bash
-conda create -n dgr python=3.8 -y
-conda activate dgr
-pip install -r requirements.txt
-pip install -e .
-```
-
-The published results were produced with Python 3.8.20, PyTorch 2.4.1+cu121, diffusers 0.35.1,
-NumPy 1.24.3. `monai` and `torchmetrics` are optional; the code falls back cleanly without them.
-
-## Pretrained weights
-
-Weights are hosted on Hugging Face under a **gated** repository — access is granted on request.
-
-| Stage | File | Notes |
-|---|---|---|
-| Stage 1 — CNN | `stage1_cnn.safetensors` | MageUltra dual-b network, PE axis 0/1 |
-| Stage 2 — diffusion | `stage2_diffusion.safetensors` | clean-image (`prediction_type="sample"`) UNet, T2 + CNN conditioned |
-
-Training checkpoints carry optimizer state; use `tools/export_checkpoint.py` to strip it and emit
-the inference-only `.safetensors` plus a `config.json` recording the architecture hyperparameters.
-`scripts/restoration/infer_dgr.py` accepts either form — given a `.safetensors` it reads the
-sibling `config.json` for the scheduler settings, which is where `prediction_type="sample"` comes
-from (the diffusers default of `"epsilon"` would silently return noise).
-
-```bash
-python tools/export_checkpoint.py --ckpt /path/to/train_ckpt.pt --out_dir hf_export/ --kind diffusion
-python tools/export_checkpoint.py --ckpt /path/to/train_ckpt.pt --out_dir hf_export/ --kind cnn
-```
+- **No extra acquisitions required** — works with the standard clinical DWI + T2W protocol; no B0 field maps, no reverse phase-encoded scans
+- **Physics-informed training** — forward ssEPI distortion simulator driven by real B0 field maps from hip-prosthesis patients, augmented via 12th-order field perturbation (>40,000 paired training samples)
+- **Hybrid CNN–Diffusion architecture** — two-stage pipeline: coarse geometric correction via CNN, fine texture restoration via conditional diffusion refinement (SDEdit-style)
+- **T2W anatomical conditioning** — uses the distortion-free T2W scan as an anatomical reference via deformable cross-attention
+- **Clinically validated** — prospective cohort of 34 subjects with severe baseline distortion; blinded radiologist scoring shows significant improvement in geometric fidelity, image quality, and diagnostic confidence
 
 ---
 
-## Pipeline
+## Method
 
 ```
                         ── FORWARD (simulation) ──
   DICOM / .mat  ─► b0_field_read ─► b0_registration ─► ΔB0 in T2 space
                                                           │
-                        generate_b0_variants_{sh,poly}  ◄──┘
-                                     │  (SH / polynomial coefficient perturbation)
+                        generate_b0_variants_{poly,sh}  ◄──┘
+                                     │  (12th-order coefficient perturbation)
                                      ▼
                             B0 variant fields
                                      │
@@ -74,12 +79,103 @@ python tools/export_checkpoint.py --ckpt /path/to/train_ckpt.pt --out_dir hf_exp
                   infer_dgr  ──►  evaluate_distortion_correction
 ```
 
+### Forward simulator
+
+`dgr/utils/warp.py :: compute_vdm_from_b0_2d_ESP` turns a ΔB0 field in Hz into a voxel
+displacement map given the echo spacing, phase-encode line count, partial-Fourier factor and
+in-plane acceleration. `dgr/utils/epi_warp.py :: forward_splat_with_fallback` then applies it as a
+**conservative forward splat** along the PE axis, so signal pile-up and stretching are both
+modelled rather than approximated by an interpolating pull-warp.
+
+### Stage 1 — CNN Restoration Backbone
+
+A 2.5D multi-scale encoder–decoder with residual blocks processes the distorted DWI alongside
+co-registered T2W. A **contrast-aware deformable cross-attention** module treats distorted DWI as
+queries and T2W as keys/values, computing adaptive spatial offsets to bridge the geometric
+mismatch between the two modalities. Feature Pyramid Network (FPN)-style top-down aggregation
+recovers fine spatial details.
+
+### Stage 2 — Conditional Diffusion Refinement
+
+A conditional diffusion UNet refines the coarse CNN output, conditioned on the T2W image and on
+the frozen stage-1 result. It is trained with `prediction_type="sample"` — the network predicts
+the clean image rather than the noise, so learning happens on the anatomical manifold. Inference
+uses **SDEdit-style img2img initialization** with DPM-Solver for fast sampling.
+
+```
+ Distorted low-b DWI ─┐
+ ADC map              ─┼─► [Stage 1: CNN Backbone] ──► Coarse-corrected DWI + ADC
+ Co-reg. T2W          ─┘         (deformable                      │
+                                  cross-attn)                      │
+                                                                   ▼
+                                                    [Stage 2: Diffusion Refinement]
+                                                     (T2W + CNN output conditioning,
+                                                      SDEdit img2img, DPM-Solver)
+                                                                   │
+                                                                   ▼
+                                                     Final corrected DWI + ADC
+                                                                   │
+                                                                   ▼
+                                                     High-b DWI (derived from ADC)
+```
+
+---
+
+## Install
+
+```bash
+git clone https://github.com/Albertlongzi/DGR
+cd DGR
+conda create -n dgr python=3.8 -y && conda activate dgr
+pip install -r requirements.txt
+pip install -e .
+```
+
+The published results were produced with Python 3.8.20, PyTorch 2.4.1+cu121, diffusers 0.35.1,
+NumPy 1.24.3. `monai` and `torchmetrics` are optional; the code falls back cleanly without them.
+
+## Pretrained weights
+
+Weights live on Hugging Face under a **gated** repository — access is reviewed and approved
+manually, and the request form asks what you intend to use them for:
+
+**https://huggingface.co/Zylong/DGR**
+
+| Stage | File | Params | Size |
+|---|---|---|---|
+| 1 — CNN | `stage1_cnn/stage1_cnn.safetensors` | 32.1 M | 128 MB |
+| 2 — diffusion | `stage2_diffusion/stage2_diffusion.safetensors` | 299.6 M | 1.20 GB |
+
+```bash
+hf auth login   # required: the repository is gated
+python - <<'PY'
+from huggingface_hub import hf_hub_download
+hf_hub_download("Zylong/DGR", "stage1_cnn/stage1_cnn.safetensors")
+hf_hub_download("Zylong/DGR", "stage2_diffusion/stage2_diffusion.safetensors")
+PY
+```
+
+Each weight file ships with a `config.json` recording the architecture hyperparameters and the
+noise-scheduler settings. `scripts/restoration/infer_dgr.py` accepts either a `.safetensors` or a
+raw training `.pt`; given the former it reads the sibling `config.json`, which is where
+`prediction_type="sample"` comes from — the diffusers default of `"epsilon"` would silently return
+noise. To produce your own release files from a training checkpoint:
+
+```bash
+python tools/export_checkpoint.py --ckpt runs/stage2/diff_epoch_092.pt \
+  --out_dir hf_export/stage2 --kind diffusion --name stage2_diffusion
+```
+
+---
+
+## Usage
+
 ### 1. Forward simulation
 
 ```bash
-# a) fit + resample the measured B0 field into physically plausible variants
-python scripts/simulation/generate_b0_variants_sh.py   --help   # spherical-harmonic perturbation (order >= 3)
+# a) fit + perturb the measured B0 field into physically plausible variants
 python scripts/simulation/generate_b0_variants_poly.py --help   # 2-D polynomial perturbation
+python scripts/simulation/generate_b0_variants_sh.py   --help   # spherical-harmonic, orders >= 3 only
 
 # b) warp undistorted DWI through the forward EPI model to build training pairs
 python scripts/simulation/generate_dwi_pairs.py \
@@ -88,31 +184,27 @@ python scripts/simulation/generate_dwi_pairs.py \
   --output_root  /path/to/dwi_pair \
   --max_b0_subjects_per_dwi 11 --smooth_sigma 1.5 --seed 123 --num_workers 6
 
-# c) held-out test set built the same way, with a disjoint B0 pool
+# c) held-out test set, built the same way from a disjoint B0 pool
 python scripts/simulation/generate_dwi_testset.py --help
 ```
 
-The forward model itself lives in `dgr/utils/warp.py`
-(`compute_vdm_from_b0_2d_ESP`: ΔB0 [Hz] → voxel displacement map, given echo spacing, PE
-lines, partial Fourier and acceleration) and `dgr/utils/epi_warp.py`
-(`forward_splat_with_fallback`: conservative forward splat along the PE axis, so signal pile-up
-and stretching are both modelled rather than approximated by an interpolating pull-warp).
+The SH generator perturbs only orders ≥ 3, leaving orders 0–2 intact so the low-order
+(shim-correctable) component stays physically consistent. The released training pairs were built
+with the **12th-order polynomial** basis.
 
 ### 2. Stage 1 — CNN
 
 ```bash
 torchrun --nproc-per-node=6 scripts/restoration/train_stage1_cnn.py \
   --npz_root /path/to/dwi_pair/pe_axis0 \
+  --npz_root2 /path/to/dwi_pair/pe_axis1 \
   --out_dir  runs/stage1_cnn \
-  --radius 2 --batch_size 6 --epochs 25 --lr 1e-4 \
+  --radius 2 --batch_size 6 --epochs 25 --lr 3e-4 --warmup_steps 3054 \
   --base_channels 64 --latent_dim 8 --prompt_k 8 --prompt_temp 1.0 \
-  --b_low 50 --b_high 1400
+  --use_ssim_loss --ssim_weight 0.25 --ms_w1 0.2 --ms_w2 0.05
 ```
 
 ### 3. Stage 2 — conditional diffusion
-
-Trained with `prediction_type="sample"` (the network predicts the clean image, not the noise),
-conditioned on the T2w image and on the frozen stage-1 CNN output.
 
 ```bash
 torchrun --nproc-per-node=4 scripts/restoration/train_stage2_diffusion.py \
@@ -128,16 +220,18 @@ torchrun --nproc-per-node=4 scripts/restoration/train_stage2_diffusion.py \
 
 ```bash
 python scripts/restoration/infer_dgr.py \
-  --ckpt      /path/to/stage2_diffusion.pt \
-  --cnn_ckpt  /path/to/stage1_cnn.pt \
-  --test_root /path/to/test_npz \
+  --cnn_ckpt  stage1_cnn/stage1_cnn.safetensors \
+  --ckpt      stage2_diffusion/stage2_diffusion.safetensors \
+  --test_root /path/to/preprocessed_test_npz \
   --out_dir   outputs/dgr_infer \
   --steps 100 --strength 0.3 --eta 0.0 --sampler dpmsolver \
   --radius 2 --t2_cond_channels 64 --b_low 50 --b_high 1400 \
   --slice_mode all --save_npz --save_slices
 ```
 
-`--strength` is the SDEdit refinement strength: 0.3 is the light refinement used in the paper.
+`--strength` is the SDEdit refinement strength. **0.3 is the value behind the released
+checkpoints** — it refines. Raising it lets the diffusion prior invent structure, so do not
+increase it without checking outputs against a reference.
 
 ### 5. Evaluation
 
@@ -145,38 +239,81 @@ python scripts/restoration/infer_dgr.py \
 python scripts/evaluation/evaluate_distortion_correction.py --help
 ```
 
-Reports PSNR / SSIM / NMSE / MAE (whole-FOV and prostate-centred), plus wall-clock timing, against
+Reports PSNR / SSIM / NMSE / MAE (whole-FOV and prostate-centred) plus wall-clock timing, against
 FUGUE and TOPUP baselines.
+
+SLURM job templates for all four steps are in `slurm/`; they take `DGR_ROOT` and `DGR_DATA` from
+the environment and bake in no absolute paths. `configs/*.yaml` record the exact settings behind
+the released checkpoints.
 
 ---
 
-## Repository layout
+## Results
+
+### Quantitative (Synthetic Benchmark, n=34)
+
+| Method | low-b PSNR ↑ | low-b NMSE ↓ | ADC PSNR ↑ | ADC NMSE ↓ |
+|:---|:---:|:---:|:---:|:---:|
+| No correction | baseline | 0.364 | baseline | — |
+| FUGUE (oracle field map) | — | — | — | — |
+| TOPUP (oracle field map) | — | — | — | — |
+| **DGR (ours)** | **23.88 ± 2.93 dB** | **0.089 ± 0.049** | **22.99 ± 1.97 dB** | **0.062 ± 0.028** |
+
+DGR significantly outperforms FUGUE and TOPUP even when those baselines are given oracle (ground-truth) B0 field maps (paired Wilcoxon, p < 0.001).
+
+### Clinical Study (Prospective Cohort, n=34, 5-point Likert scale)
+
+| Criterion | Original ssEPI | DGR | p-value |
+|:---|:---:|:---:|:---:|
+| Geometric fidelity | 2.6 | **3.3** | < 0.001 |
+| Overall image quality | 2.5 | **2.9** | < 0.001 |
+| Diagnostic confidence | 2.5 | **3.0** | < 0.001 |
+
+- Zero false negatives and zero false positives in lesion analysis (n=18 with histopathology)
+- Inference time: **13–15 seconds** per subject on NVIDIA H100
+
+---
+
+## Repository Structure
 
 ```
-dgr/
-  physics/      B0 field I/O, DICOM handling, SH & polynomial field fitting, B0→T2 registration
-  utils/        forward EPI model: VDM computation, splat/warp/resample kernels
-  models/       phc_net → phc_e2e_mega_net → phc_e2e_mageultra_net (stage 1);
-                diffusion_unet_diffusers (stage 2)
-  data/         paired dual-b NPZ dataset with 2.5-D slice stacking
-  inference/    DDIM / DDPM / DPM-Solver samplers with T2 + CNN conditioning
-  losses/       stage-1 losses (SSIM, ADC consistency, relative intensity, TV / Jacobian penalties)
-  conditioning/ T2w conditioning channel construction
-scripts/
-  simulation/   forward-model entry points
-  restoration/  stage-1 / stage-2 training and DGR inference
-  evaluation/   quantitative comparison against FUGUE / TOPUP
-slurm/          SLURM job templates
-tools/          checkpoint export for Hugging Face
-configs/        YAML records of the exact settings used for the published runs
+DGR/
+├── dgr/                   # library
+│   ├── physics/           #   B0 field I/O, DICOM handling, SH & polynomial fitting, B0→T2 registration
+│   ├── utils/             #   forward EPI model: VDM computation, splat / warp / resample kernels
+│   ├── models/            #   phc_net → phc_e2e_mega_net → phc_e2e_mageultra_net (stage 1)
+│   │                      #   diffusion_unet_diffusers (stage 2)
+│   ├── data/              #   paired dual-b NPZ dataset with 2.5-D slice stacking
+│   ├── inference/         #   DDIM / DDPM / DPM-Solver samplers with T2 + CNN conditioning
+│   ├── losses/            #   SSIM, ADC consistency, relative intensity, TV / Jacobian penalties
+│   └── conditioning/      #   T2W conditioning channel construction
+├── scripts/
+│   ├── simulation/        # forward-model entry points
+│   ├── restoration/       # stage-1 / stage-2 training and DGR inference
+│   └── evaluation/        # quantitative comparison against FUGUE / TOPUP
+├── configs/               # YAML records of the settings behind the released checkpoints
+├── slurm/                 # portable SLURM job templates
+└── tools/                 # checkpoint export for Hugging Face
 ```
+
+---
 
 ## Data
 
-The clinical prostate data used in the paper cannot be redistributed. The pipeline consumes
-per-subject `.npz` volumes; `configs/simulation.yaml` documents the expected keys so the
-simulation half can be reproduced on any DWI + T2w + ΔB0 source, including the public
-[fastMRI Prostate](https://github.com/cai2r/fastMRI_prostate) dataset.
+This work uses two datasets:
+
+| Dataset | Subjects | Usage |
+|:---|:---:|:---|
+| [fastMRI Prostate](https://fastmri.med.nyu.edu/) | 314 exams | Training / Test |
+| In-house (Cedars-Sinai Medical Center) | 130 exams | Training / Test |
+
+B0 field maps were acquired from 11 patients with hip prostheses and augmented to 110 maps via 12th-order perturbation, driving the forward distortion simulator.
+
+The clinical source data cannot be redistributed. The simulation half of this repository lets the
+training pairs be regenerated from any DWI + T2w + ΔB0 source, including the public fastMRI
+Prostate dataset. `configs/simulation.yaml` documents the expected NPZ keys.
+
+---
 
 ## Citation
 
@@ -195,6 +332,19 @@ simulation half can be reproduced on any DWI + T2w + ΔB0 source, including the 
 }
 ```
 
+---
+
 ## License
 
-See [LICENSE](LICENSE). Research use only; not a medical device and not cleared for clinical use.
+Code is released under the [MIT license](LICENSE). The pretrained weights are distributed
+separately under a research-only license — see the
+[Hugging Face repository](https://huggingface.co/Zylong/DGR).
+
+**Not a medical device.** Not cleared or approved for clinical use, diagnosis, or treatment
+planning by any regulatory body.
+
+---
+
+## Acknowledgements
+
+This work was supported by NIH grants R01NS121544, R01HL156818, R01HL165211, R01HL181091, and R43NS120795. We thank the Research Imaging Core (RIC) at Cedars-Sinai Medical Center, MRI Technologist Mike Ngo, Irene Lee, and nurses Catherine Ubaldo-Prado and Lee Hyae for their support in data acquisition.
