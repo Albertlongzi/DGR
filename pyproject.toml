@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dgr"
+version = "0.1.0"
+description = "Distortion-guided restoration (DGR) for prostate diffusion MRI"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [{ name = "Ziyang Long" }]
+keywords = ["MRI", "diffusion MRI", "EPI distortion", "diffusion model", "prostate"]
+
+[project.urls]
+Homepage = "https://github.com/Albertlongzi/DGR"
+Paper = "https://doi.org/10.1093/radadv/umag031"
+
+[tool.setuptools.packages.find]
+include = ["dgr*"]

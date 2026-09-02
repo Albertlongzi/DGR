@@ -1,0 +1,33 @@
+# Stage 1 — CNN front-end. Settings of the released checkpoint
+# (25 epochs, both PE axes, best validation loss at epoch 25).
+data:
+  npz_root: /path/to/dwi_pair/pe_axis0
+  npz_root2: /path/to/dwi_pair/pe_axis1
+  axis_filter: null          # null = train on both PE axes
+  val_split: 0.1
+  radius: 2                  # 2.5-D slice stack: 2*radius+1 slices
+
+model:
+  base_channels: 64
+  latent_dim: 8
+  prompt_k: 8
+  prompt_temp: 1.0
+
+train:
+  epochs: 25
+  batch_size: 6              # per rank; released run used 6 GPUs via torchrun
+  lr: 3.0e-4
+  warmup_steps: 3054
+  autoscale_lr: true
+  autoscale_mode: sqrt
+  autoscale_warmup: true
+
+loss:
+  use_ssim_loss: true
+  ssim_weight: 0.25
+  ms_w1: 0.2                 # multi-scale term weights
+  ms_w2: 0.05
+
+physics:
+  b_low: 50
+  b_high: 1400

@@ -1,0 +1,21 @@
+# Pinned to the environment the published DGR results were produced with
+# (Python 3.8.20, CUDA 12.1).
+torch==2.4.1
+torchvision==0.19.1
+numpy==1.24.3
+scipy==1.10.1
+diffusers==0.35.1
+safetensors==0.5.3
+scikit-image==0.21.0
+opencv-python-headless>=4.7
+nibabel==5.2.1
+pydicom==2.4.4
+SimpleITK==2.3.1
+h5py>=3.7
+matplotlib==3.7.5
+tqdm==4.67.1
+PyYAML==6.0.2
+
+# Optional
+# monai>=1.2          # SSIM loss + BasicUNet backbone (graceful fallback if absent)
+# torchmetrics>=1.0   # SSIM metric during stage-1 validation

@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "DGR — Distortion-Guided Restoration for Prostate Diffusion MRI"
+repository-code: "https://github.com/Albertlongzi/DGR"
+license: MIT
+preferred-citation:
+  type: article
+  title: "Distortion-guided restoration: a physics-informed learning framework to correct prostate diffusion MRI artifacts"
+  authors:
+    - family-names: Long
+      given-names: Ziyang
+    - family-names: Binesh
+      given-names: Nader
+    - family-names: Wang
+      given-names: Lixia
+    - family-names: Malaji
+      given-names: Archana Vadiraj
+    - family-names: Yang
+      given-names: Chia-Chi
+    - family-names: Sun
+      given-names: Haoran
+    - family-names: Saouaf
+      given-names: Rola
+    - family-names: Daskivich
+      given-names: Timothy
+    - family-names: Kim
+      given-names: Hyung
+    - family-names: Xie
+      given-names: Yibin
+    - family-names: Li
+      given-names: Debiao
+    - family-names: Yang
+      given-names: Hsin-Jung
+  journal: "Radiology Advances"
+  volume: 3
+  issue: 4
+  year: 2026
+  doi: "10.1093/radadv/umag031"

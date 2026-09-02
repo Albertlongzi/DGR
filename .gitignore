@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Checkpoints and weights (distributed via Hugging Face, gated)
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+runs/
+network_runs/
+
+# Data — never commit patient data or derived volumes
+*.npz
+*.nii
+*.nii.gz
+*.mat
+*.dcm
+*.h5
+data/
+dwi_pair/
+B0_variants*/
+preprocessed_*/
+
+# Outputs
+outputs/
+*.out
+*.err
+slurm-*.out
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# SLURM logs
+logs/*
+!logs/.gitkeep

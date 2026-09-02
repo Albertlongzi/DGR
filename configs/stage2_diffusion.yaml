@@ -1,0 +1,47 @@
+# Stage 2 — conditional diffusion refinement. Settings of the released checkpoint.
+#
+# prediction_type = "sample": the UNet predicts the clean image directly rather than
+# the noise, so training operates on the anatomical manifold.
+data:
+  npz_root: /path/to/dwi_pair/pe_axis0
+  val_split: 0.1
+  radius: 2
+
+model:
+  t2_cond_channels: 64
+  t2_contrast_mod: none      # none | canny | ...
+  t2_canny_low: 50
+  t2_canny_high: 150
+
+# Frozen stage-1 CNN supplying the conditioning image. Architecture must match
+# configs/stage1_cnn.yaml.
+cnn:
+  ckpt: /path/to/stage1_cnn.pt
+  base_channels: 64
+  latent_dim: 8
+  prompt_k: 8
+  prompt_temp: 1.0
+  memory_cache_size: 10000
+
+train:
+  epochs: 100
+  batch_size: 6              # per rank; released run used 4 x H100 via torchrun
+  lr: 1.0e-4
+  warmup_steps: 1000
+  gradient_accumulation_steps: 1
+  max_grad_norm: 1.0
+  num_train_timesteps: 1000
+  num_workers: 3
+  prefetch_factor: 3
+
+validation:
+  val_interval: 2
+  val_steps: 50
+  val_strength: 0.3
+  use_dpm_solver_validation: true
+  val_vis: true
+  val_vis_n: 6
+
+physics:
+  b_low: 50
+  b_high: 1400

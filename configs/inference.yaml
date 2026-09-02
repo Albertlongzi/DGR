@@ -1,0 +1,35 @@
+# DGR inference — settings used for the published figures and metrics.
+checkpoints:
+  diffusion: /path/to/stage2_diffusion.pt
+  cnn: /path/to/stage1_cnn.pt
+
+sampling:
+  sampler: dpmsolver         # dpmsolver | ddim | ddpm
+  steps: 100
+  strength: 0.3              # SDEdit refinement strength (light refinement)
+  eta: 0.0
+
+model:
+  radius: 2
+  t2_cond_channels: 64
+  t2_contrast_mod: none
+  t2_canny_low: 50
+  t2_canny_high: 150
+  cnn_base_channels: 64
+  cnn_latent_dim: 8
+  cnn_prompt_k: 8
+  cnn_prompt_temp: 1.0
+
+physics:
+  b_low: 50
+  b_high: 1400
+
+output:
+  slice_mode: all
+  save_npz: true
+  save_slices: true
+  # display-only gamma / windowing for the rendered panels
+  gamma_b14: 0.4
+  gamma_adc: 0.7
+  adc_plo: 2.0
+  adc_phi: 99.0

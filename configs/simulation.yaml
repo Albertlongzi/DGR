@@ -1,0 +1,44 @@
+# Forward distortion simulator — settings used to build the paired training data.
+#
+# Expected per-subject input NPZ keys (raw, un-normalised):
+#   dwi_registered | dwi | DWI   float32 (H, W, Z) or (H, W, Z, B)  undistorted DWI
+#   t2 | T2 | t2_registered      float32 (H, W, Z)                  co-registered T2w
+#   b0 | b0_variant              float32 (H, W, Z)                  ΔB0 field in Hz, T2 space
+# B0 variant NPZs are written by scripts/simulation/generate_b0_variants_{sh,poly}.py.
+
+b0_variants:
+  # Polynomial-coefficient perturbation was used for the published pairs.
+  generator: poly            # poly | sh
+  order: 12
+  # SH generator perturbs only order >= 3 terms, leaving orders 0-2 intact so the
+  # low-order (shim-correctable) component stays physically consistent.
+
+dwi_pairs:
+  b0_root: /path/to/B0_variants_poly/order_12
+  input_roots:
+    - /path/to/preprocessed_local
+    - /path/to/preprocessed_fastmri
+    - /path/to/preprocessed_disease
+  output_root: /path/to/dwi_pair
+  max_b0_subjects_per_dwi: 11
+  variants_per_b0_subject: 0            # in-house local cohort
+  variants_per_b0_subject_fastmri: 1
+  variants_per_b0_subject_diease: 1
+  smooth_sigma: 1.5
+  seed: 123
+  num_workers: 6
+
+# EPI forward model (dgr/utils/warp.py :: compute_vdm_from_b0_2d_ESP).
+# Leave unset to use each subject's acquisition metadata; override only to force a
+# fixed readout geometry across a heterogeneous cohort.
+epi:
+  esp_s: null                # echo spacing (s)
+  npe: null                  # phase-encode lines
+  pf: null                   # partial-Fourier factor
+  r: null                    # in-plane acceleration
+  vdm_pe_src_mm: null        # source PE voxel size (mm)
+  vdm_pe_tgt_mm: null        # target PE voxel size (mm)
+
+b_values:
+  low: 50
+  high: 1400
