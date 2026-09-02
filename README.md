@@ -50,7 +50,7 @@ just run the network:
 ## Key Features
 
 - **No extra acquisitions required** — works with the standard clinical DWI + T2W protocol; no B0 field maps, no reverse phase-encoded scans
-- **Physics-informed training** — forward ssEPI distortion simulator driven by real B0 field maps from hip-prosthesis patients, augmented via 12th-order field perturbation (>40,000 paired training samples)
+- **Physics-informed training** — forward ssEPI distortion simulator driven by 11 real B0 field maps from hip-prosthesis patients, augmented to 110 maps by perturbing the high-order terms of a 12th-order 2-D polynomial fit (>40,000 paired training samples)
 - **Hybrid CNN–Diffusion architecture** — two-stage pipeline: coarse geometric correction via CNN, fine texture restoration via conditional diffusion refinement (SDEdit-style)
 - **T2W anatomical conditioning** — uses the distortion-free T2W scan as an anatomical reference via deformable cross-attention
 - **Clinically validated** — prospective cohort of 34 subjects with severe baseline distortion; blinded radiologist scoring shows significant improvement in geometric fidelity, image quality, and diagnostic confidence
@@ -64,7 +64,7 @@ just run the network:
   DICOM / .mat  ─► b0_field_read ─► b0_registration ─► ΔB0 in T2 space
                                                           │
                         generate_b0_variants_{poly,sh}  ◄──┘
-                                     │  (12th-order coefficient perturbation)
+                                     │  (12th-order polynomial coeff. perturbation)
                                      ▼
                             B0 variant fields
                                      │
@@ -188,9 +188,11 @@ python scripts/simulation/generate_dwi_pairs.py \
 python scripts/simulation/generate_dwi_testset.py --help
 ```
 
-The SH generator perturbs only orders ≥ 3, leaving orders 0–2 intact so the low-order
-(shim-correctable) component stays physically consistent. The released training pairs were built
-with the **12th-order polynomial** basis.
+Two perturbation bases are provided. The **released training pairs used the 12th-order 2-D
+polynomial** basis (`generate_b0_variants_poly.py`, fitted per slice), scaling the high-order
+coefficients by factors of 0–0.15 to turn 11 measured field maps into 110. The spherical-harmonic
+generator is included as an alternative; it perturbs only orders ≥ 3, leaving orders 0–2 intact so
+the shim-correctable component stays fixed.
 
 ### 2. Stage 1 — CNN
 
@@ -229,9 +231,10 @@ python scripts/restoration/infer_dgr.py \
   --slice_mode all --save_npz --save_slices
 ```
 
-`--strength` is the SDEdit refinement strength. **0.3 is the value behind the released
-checkpoints** — it refines. Raising it lets the diffusion prior invent structure, so do not
-increase it without checking outputs against a reference.
+`--strength` is the SDEdit refinement strength. **Use 0.1–0.3**: 0.1 is the conservative
+setting reported in the paper, and 0.3 is the default in this script and the value every final
+inference run used. Above that range the diffusion prior starts inventing structure rather than
+refining, so do not raise it without checking outputs against a reference.
 
 ### 5. Evaluation
 
@@ -302,12 +305,13 @@ DGR/
 
 This work uses two datasets:
 
-| Dataset | Subjects | Usage |
+| Dataset | Examinations | Usage |
 |:---|:---:|:---|
-| [fastMRI Prostate](https://fastmri.med.nyu.edu/) | 314 exams | Training / Test |
-| In-house (Cedars-Sinai Medical Center) | 130 exams | Training / Test |
+| [fastMRI Prostate](https://fastmri.med.nyu.edu/) | 312 | Training / Test |
+| In-house (Cedars-Sinai Medical Center) | 130 | Training / Test |
+| **Total** | **442** | 408 training, 34 clinical test (5 fastMRI + 29 Cedars-Sinai) |
 
-B0 field maps were acquired from 11 patients with hip prostheses and augmented to 110 maps via 12th-order perturbation, driving the forward distortion simulator.
+B0 field maps were acquired from 11 patients with unilateral or bilateral hip prostheses and augmented to 110 maps by perturbing the high-order terms of a 12th-order 2-D polynomial fit, driving the forward distortion simulator.
 
 The clinical source data cannot be redistributed. The simulation half of this repository lets the
 training pairs be regenerated from any DWI + T2w + ΔB0 source, including the public fastMRI

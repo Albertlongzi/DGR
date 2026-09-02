@@ -7,11 +7,15 @@
 # B0 variant NPZs are written by scripts/simulation/generate_b0_variants_{sh,poly}.py.
 
 b0_variants:
-  # Polynomial-coefficient perturbation was used for the published pairs.
+  # Settings behind the released pairs: 11 measured field maps -> 110 variants.
   generator: poly            # poly | sh
+  fit_type: poly2d           # 2-D polynomial fit, per slice
   order: 12
-  # SH generator perturbs only order >= 3 terms, leaving orders 0-2 intact so the
-  # low-order (shim-correctable) component stays physically consistent.
+  min_order_adjusted: 1      # scale coefficients of total order >= this
+  adjustment_factors: [0.0, 0.03, 0.06, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14, 0.15]
+  # The spherical-harmonic generator is provided as an alternative; it perturbs only
+  # order >= 3 terms, leaving orders 0-2 intact so the shim-correctable component
+  # stays fixed. It was not used for the released pairs.
 
 dwi_pairs:
   b0_root: /path/to/B0_variants_poly/order_12
