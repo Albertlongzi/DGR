@@ -41,6 +41,9 @@ Weights are hosted on Hugging Face under a **gated** repository — access is gr
 
 Training checkpoints carry optimizer state; use `tools/export_checkpoint.py` to strip it and emit
 the inference-only `.safetensors` plus a `config.json` recording the architecture hyperparameters.
+`scripts/restoration/infer_dgr.py` accepts either form — given a `.safetensors` it reads the
+sibling `config.json` for the scheduler settings, which is where `prediction_type="sample"` comes
+from (the diffusers default of `"epsilon"` would silently return noise).
 
 ```bash
 python tools/export_checkpoint.py --ckpt /path/to/train_ckpt.pt --out_dir hf_export/ --kind diffusion

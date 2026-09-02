@@ -17,6 +17,7 @@ Supports multi-GPU inference via --num_gpus flag (default: all available).
 import os
 import sys
 import glob
+import json
 import argparse
 from typing import Dict, Optional, Tuple, List
 import multiprocessing as mp
@@ -338,9 +339,39 @@ def _prepare_case_payload(
     }
 
 
-def _build_scheduler_config(ckpt: Dict) -> Dict:
-    if "noise_scheduler_config" in ckpt:
-        return dict(ckpt["noise_scheduler_config"])
+def _load_checkpoint(path: str) -> Tuple[Dict, Dict]:
+    """Load either a training checkpoint (.pt) or a released .safetensors file.
+
+    Returns ``(state_dict, meta)``. For a ``.pt`` the metadata is the checkpoint dict
+    itself; for a ``.safetensors`` it is the sibling ``config.json`` written by
+    ``tools/export_checkpoint.py``, which carries the same architecture and scheduler
+    information with the optimizer state stripped.
+    """
+    if path.endswith(".safetensors"):
+        from safetensors.torch import load_file
+
+        state = load_file(path)
+        meta = {}
+        cfg_path = os.path.join(os.path.dirname(os.path.abspath(path)), "config.json")
+        if os.path.exists(cfg_path):
+            with open(cfg_path) as f:
+                cfg = json.load(f)
+            meta = dict(cfg.get("arch") or {})
+            if cfg.get("noise_scheduler"):
+                meta["noise_scheduler_config"] = cfg["noise_scheduler"]
+        return state, meta
+
+    ckpt = torch.load(path, map_location="cpu")
+    state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+    meta = dict(ckpt.get("args") or {}) if isinstance(ckpt, dict) else {}
+    if isinstance(ckpt, dict) and "noise_scheduler_config" in ckpt:
+        meta["noise_scheduler_config"] = ckpt["noise_scheduler_config"]
+    return state, meta
+
+
+def _build_scheduler_config(meta: Dict) -> Dict:
+    if "noise_scheduler_config" in meta:
+        return dict(meta["noise_scheduler_config"])
     return {
         "num_train_timesteps": 1000,
         "beta_schedule": "linear",
@@ -362,8 +393,8 @@ def _load_cnn_model(args, device: torch.device) -> PHCE2EMageUltraNet:
         prompt_temp=args.cnn_prompt_temp,
     )
     
-    ckpt = torch.load(args.cnn_ckpt, map_location="cpu")
-    cnn.load_state_dict(ckpt["model"])
+    state, _ = _load_checkpoint(args.cnn_ckpt)
+    cnn.load_state_dict(state)
     cnn = cnn.to(device).eval()
     
     return cnn
@@ -371,11 +402,8 @@ def _load_cnn_model(args, device: torch.device) -> PHCE2EMageUltraNet:
 
 def _load_diffusion_model(args, device: torch.device) -> Tuple[DiffusionUNetT2AndCNN, Dict]:
     """Load T2+CNN conditional diffusion model for Stage 2 refinement."""
-    ckpt = torch.load(args.ckpt, map_location="cpu")
-    ckpt_args = ckpt.get("args", {})
-    
-    model_state = ckpt["model"]
-    t2_cond_channels = ckpt_args.get("t2_cond_channels", args.t2_cond_channels)
+    model_state, meta = _load_checkpoint(args.ckpt)
+    t2_cond_channels = meta.get("t2_cond_channels", args.t2_cond_channels)
     
     model = DiffusionUNetT2AndCNN(
         fusion_channels=t2_cond_channels,
@@ -383,7 +411,7 @@ def _load_diffusion_model(args, device: torch.device) -> Tuple[DiffusionUNetT2An
     model.load_state_dict(model_state)
     model = model.to(device).eval()
     
-    scheduler_cfg = _build_scheduler_config(ckpt)
+    scheduler_cfg = _build_scheduler_config(meta)
     
     return model, scheduler_cfg
 
