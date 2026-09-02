@@ -255,14 +255,24 @@ the released checkpoints.
 
 ### Quantitative (Synthetic Benchmark, n=34)
 
-| Method | low-b PSNR ↑ | low-b NMSE ↓ | ADC PSNR ↑ | ADC NMSE ↓ |
-|:---|:---:|:---:|:---:|:---:|
-| No correction | baseline | 0.364 | baseline | — |
-| FUGUE (oracle field map) | — | — | — | — |
-| TOPUP (oracle field map) | — | — | — | — |
-| **DGR (ours)** | **23.88 ± 2.93 dB** | **0.089 ± 0.049** | **22.99 ± 1.97 dB** | **0.062 ± 0.028** |
+Table 2 of the paper. FUGUE and TOPUP are given the inputs they need — an acquired field map and a
+reverse phase-encode acquisition respectively — while DGR uses neither.
 
-DGR significantly outperforms FUGUE and TOPUP even when those baselines are given oracle (ground-truth) B0 field maps (paired Wilcoxon, p < 0.001).
+| Method | Contrast | PSNR (dB) ↑ | NMSE ↓ | SSIM ↑ |
+|:---|:---:|:---:|:---:|:---:|
+| Baseline (no correction) | b = 50 | 17.67 ± 4.06 | 0.447 ± 0.355 | 0.564 ± 0.146 |
+| Baseline (no correction) | ADC | 15.60 ± 2.51 | 0.351 ± 0.172 | 0.281 ± 0.115 |
+| FUGUE + fieldmap | b = 50 | 17.92 ± 7.11 | 0.903 ± 1.334 | **0.770 ± 0.094** |
+| FUGUE + fieldmap | ADC | 22.37 ± 2.51 | 0.073 ± 0.040 | **0.736 ± 0.065** |
+| TOPUP + reverse PE | b = 50 | 22.45 ± 4.83 | 0.175 ± 0.181 | 0.705 ± 0.115 |
+| TOPUP + reverse PE | ADC | 19.42 ± 2.92 | 0.157 ± 0.107 | 0.409 ± 0.140 |
+| **DGR (ours)** | b = 50 | **23.88 ± 2.93** | **0.089 ± 0.049** | 0.706 ± 0.079 |
+| **DGR (ours)** | ADC | **22.99 ± 1.97** | **0.062 ± 0.028** | 0.624 ± 0.107 |
+
+Improvements in PSNR and NMSE were statistically significant against TOPUP and/or FUGUE across
+both contrasts (paired Wilcoxon signed-rank, all *P* < .001 except low-b PSNR vs TOPUP, *P* = .02).
+DGR leads on PSNR and NMSE for both contrasts; FUGUE retains the higher SSIM, though at a much
+worse low-b NMSE (0.903 ± 1.334) and with a field map DGR never sees.
 
 ### Clinical Study (Prospective Cohort, n=34, 5-point Likert scale)
 
